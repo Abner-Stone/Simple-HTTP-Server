@@ -1,3 +1,0 @@
-/Users/abnerstone/Projects/CodeCrafters/codecrafters-http-server-c/build/CMakeFiles/http-server.dir
-/Users/abnerstone/Projects/CodeCrafters/codecrafters-http-server-c/build/CMakeFiles/edit_cache.dir
-/Users/abnerstone/Projects/CodeCrafters/codecrafters-http-server-c/build/CMakeFiles/rebuild_cache.dir
