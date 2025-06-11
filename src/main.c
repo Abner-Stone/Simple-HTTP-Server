@@ -57,6 +57,10 @@ int main() {
   int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
   printf("Client connected\n");
   printf("Client_fd: %d\n", client_fd);
+  if (client_fd < 0) {
+    printf("Accept failed: %s \n", strerror(errno));
+    return 1;
+  }
 
   close(server_fd);
 
