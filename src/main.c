@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +11,9 @@
 
 #define MAX_REQUEST_SIZE 4096
 #define TIMEOUT 5
+
+int read_request(char buffer[], int client_fd, int server_fd);
+int useRegex(char *textToCheck);
 
 int main() {
   // Disable output buffering
@@ -65,7 +69,23 @@ int main() {
     return 1;
   }
 
-  char buffer[MAX_REQUEST_SIZE];
+  char request_buffer[MAX_REQUEST_SIZE];
+
+  read_request(request_buffer, client_fd, server_fd);
+  printf("Received request:\n%s", request_buffer);
+  printf("%d\n", useRegex(request_buffer));
+
+  // Send 200 OK response
+  char *response = "HTTP/1.1 200 OK\r\n\r\n";
+  ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
+
+  close(server_fd);
+  close(client_fd);
+
+  return 0;
+}
+
+int read_request(char buffer[], int client_fd, int server_fd) {
   int total_read = 0;
   buffer[0] = '\0';  // Initialize buffer to an empty string
 
@@ -80,21 +100,21 @@ int main() {
     timeout.tv_usec = 0;
 
     int indication = select(client_fd + 1, &read_fds, NULL, NULL, &timeout);
-    printf("Indication from select: %d\n", indication);
+    // printf("Indication from select: %d\n", indication);
     if (indication == -1) {
       printf("Select failed: %s\n", strerror(errno));
       close(client_fd);
       close(server_fd);
       return 1;
     } else if (indication == 0) {
-      printf("Timeout occured, no data received within %d seconds.\n",
-             TIMEOUT);
+      printf("Timeout occured, no data received within %d seconds.\n", TIMEOUT);
       close(client_fd);
       close(server_fd);
       return 1;
     }
 
-    ssize_t bytes_recvd = recv(client_fd, buffer + total_read, MAX_REQUEST_SIZE - 1 - total_read, 0);
+    ssize_t bytes_recvd = recv(client_fd, buffer + total_read,
+                               MAX_REQUEST_SIZE - 1 - total_read, 0);
     if (bytes_recvd < 0) {
       printf("Receive failed: %s \n", strerror(errno));
       close(client_fd);
@@ -105,29 +125,54 @@ int main() {
     total_read += bytes_recvd;
     buffer[total_read] = '\0';
 
+    // printf("Bytes received: %zd\n", bytes_recvd);
+    // printf("Total bytes read: %d\n", total_read);
+    // printf("Buffer content: %s\n", buffer);
 
     if (strstr(buffer, "\r\n\r\n")) {
-      printf("breaking");
+      printf("End of request\n");
       break;
     }
 
     if (total_read >= MAX_REQUEST_SIZE - 1) {
-      printf("Request too large, exceeding maximum size of %d bytes.\n", MAX_REQUEST_SIZE);
+      printf("Request too large, exceeding maximum size of %d bytes.\n",
+             MAX_REQUEST_SIZE);
       // Send 413 status code
       close(client_fd);
       close(server_fd);
       return 1;
     }
   }
+}
 
-  printf("Received request:\n%s", buffer);
+int useRegex(char *textToCheck) {
+  regex_t compiledRegex;
+  int reti;
+  int actualReturnValue = -1;
+  char messageBuffer[100];
 
-  // Send 200 OK response
-  char *response = "HTTP/1.1 200 OK\r\n\r\n";
-  ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
+  /* Compile regular expression */
+  reti = regcomp(&compiledRegex, "GET /[^[:space:]]*", REG_EXTENDED | REG_ICASE);
+  if (reti) {
+    fprintf(stderr, "Could not compile regex\n");
+    return -2;
+  }
 
-  close(server_fd);
-  close(client_fd);
+  /* Execute compiled regular expression */
+  reti = regexec(&compiledRegex, textToCheck, 0, NULL, 0);
+  if (!reti) {
+    puts("Match");
+    actualReturnValue = 0;
+  } else if (reti == REG_NOMATCH) {
+    puts("No match");
+    actualReturnValue = 1;
+  } else {
+    regerror(reti, &compiledRegex, messageBuffer, sizeof(messageBuffer));
+    fprintf(stderr, "Regex match failed: %s\n", messageBuffer);
+    actualReturnValue = -3;
+  }
 
-  return 0;
+  /* Free memory allocated to the pattern buffer by regcomp() */
+  regfree(&compiledRegex);
+  return actualReturnValue;
 }
