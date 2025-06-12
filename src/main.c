@@ -12,8 +12,6 @@ int main() {
   setbuf(stdout, NULL);
   setbuf(stderr, NULL);
 
-  // You can use print statements as follows for debugging, they'll be visible
-  // when running tests.
   printf("Logs from your program will appear here!\n");
 
   int server_fd, client_addr_len;
