@@ -5,7 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
+
+#define MAX_REQUEST_SIZE 4096
+#define TIMEOUT 5
 
 int main() {
   // Disable output buffering
@@ -52,7 +56,8 @@ int main() {
   printf("Waiting for a client to connect...\n");
   client_addr_len = sizeof(client_addr);
 
-  int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+  int client_fd =
+      accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
   printf("Client connected\n");
   printf("Client_fd: %d\n", client_fd);
   if (client_fd < 0) {
@@ -60,11 +65,69 @@ int main() {
     return 1;
   }
 
+  char buffer[MAX_REQUEST_SIZE];
+  int total_read = 0;
+  buffer[0] = '\0';  // Initialize buffer to an empty string
+
+  while (total_read <= MAX_REQUEST_SIZE - 1) {
+    fd_set read_fds;
+    struct timeval timeout;
+
+    FD_ZERO(&read_fds);
+    FD_SET(client_fd, &read_fds);
+
+    timeout.tv_sec = TIMEOUT;
+    timeout.tv_usec = 0;
+
+    int indication = select(client_fd + 1, &read_fds, NULL, NULL, &timeout);
+    printf("Indication from select: %d\n", indication);
+    if (indication == -1) {
+      printf("Select failed: %s\n", strerror(errno));
+      close(client_fd);
+      close(server_fd);
+      return 1;
+    } else if (indication == 0) {
+      printf("Timeout occured, no data received within %d seconds.\n",
+             TIMEOUT);
+      close(client_fd);
+      close(server_fd);
+      return 1;
+    }
+
+    ssize_t bytes_recvd = recv(client_fd, buffer + total_read, MAX_REQUEST_SIZE - 1 - total_read, 0);
+    if (bytes_recvd < 0) {
+      printf("Receive failed: %s \n", strerror(errno));
+      close(client_fd);
+      close(server_fd);
+      return 1;
+    }
+
+    total_read += bytes_recvd;
+    buffer[total_read] = '\0';
+
+
+    if (strstr(buffer, "\r\n\r\n")) {
+      printf("breaking");
+      break;
+    }
+
+    if (total_read >= MAX_REQUEST_SIZE - 1) {
+      printf("Request too large, exceeding maximum size of %d bytes.\n", MAX_REQUEST_SIZE);
+      // Send 413 status code
+      close(client_fd);
+      close(server_fd);
+      return 1;
+    }
+  }
+
+  printf("Received request:\n%s", buffer);
+
   // Send 200 OK response
-  char* response = "HTTP/1.1 200 OK\r\n\r\n";
+  char *response = "HTTP/1.1 200 OK\r\n\r\n";
   ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
 
   close(server_fd);
+  close(client_fd);
 
   return 0;
 }
