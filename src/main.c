@@ -74,12 +74,12 @@ int main() {
 
   read_request(request_buffer, client_fd, server_fd);
   printf("Received request:\n%s", request_buffer);
-  printf("PRINTING PATH NOW\n");
-  printf("%s\n", extract_path(request_buffer));
+  // printf("PRINTING PATH NOW\n");
+  // printf("%s\n", extract_path(request_buffer));
 
   char *response = "\0";
-  printf("got past extract_path\n");
-  printf("PATH: %s\n", extract_path(request_buffer));
+  // printf("got past extract_path\n");
+  // printf("PATH: %s\n", extract_path(request_buffer));
   char* path = extract_path(request_buffer);
   if (path == NULL || strcmp(path, "") == 0) {
     printf("No valid path found in request\n");
@@ -215,7 +215,7 @@ char *extract_path(const char *input) {
       printf("No path found after slash\n");
       regfree(&regex);
       printf("returning NULL\n");
-      return "";
+      return NULL;
     }
 
     // Allocate memory (+1 for null terminator)
