@@ -13,7 +13,8 @@
 #define TIMEOUT 5
 
 int read_request(char buffer[], int client_fd, int server_fd);
-int useRegex(char *textToCheck);
+// int useRegex(char *textToCheck);
+char *extract_path(const char *input);
 
 int main() {
   // Disable output buffering
@@ -73,11 +74,18 @@ int main() {
 
   read_request(request_buffer, client_fd, server_fd);
   printf("Received request:\n%s", request_buffer);
-  printf("%d\n", useRegex(request_buffer));
+  printf("%s\n", extract_path(request_buffer));
 
-  // Send 200 OK response
-  char *response = "HTTP/1.1 200 OK\r\n\r\n";
-  ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
+  char *response = "\0";
+  printf("PATH: %s\n", extract_path(request_buffer));
+  if (extract_path(request_buffer) == "\0") {
+    // Send 200 OK response
+    response = "HTTP/1.1 200 OK\r\n\r\n";
+    ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
+  } else {
+    response = "HTTP/1.1 404 Not Found\r\n\r\n";
+    ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
+  }
 
   close(server_fd);
   close(client_fd);
@@ -145,34 +153,65 @@ int read_request(char buffer[], int client_fd, int server_fd) {
   }
 }
 
-int useRegex(char *textToCheck) {
-  regex_t compiledRegex;
-  int reti;
-  int actualReturnValue = -1;
-  char messageBuffer[100];
+// int useRegex(char *textToCheck) {
+//   regex_t compiledRegex;
+//   int reti;
+//   int actualReturnValue = -1;
+//   char messageBuffer[100];
 
-  /* Compile regular expression */
-  reti = regcomp(&compiledRegex, "GET /[^[:space:]]*", REG_EXTENDED | REG_ICASE);
-  if (reti) {
-    fprintf(stderr, "Could not compile regex\n");
-    return -2;
+//   /* Compile regular expression */
+//   reti = regcomp(&compiledRegex, "GET /[^[:space:]]*", REG_EXTENDED |
+//   REG_ICASE); if (reti) {
+//     fprintf(stderr, "Could not compile regex\n");
+//     return -2;
+//   }
+
+//   /* Execute compiled regular expression */
+//   reti = regexec(&compiledRegex, textToCheck, 0, NULL, 0);
+//   if (!reti) {
+//     puts("Match");
+//     actualReturnValue = 0;
+//   } else if (reti == REG_NOMATCH) {
+//     puts("No match");
+//     actualReturnValue = 1;
+//   } else {
+//     regerror(reti, &compiledRegex, messageBuffer, sizeof(messageBuffer));
+//     fprintf(stderr, "Regex match failed: %s\n", messageBuffer);
+//     actualReturnValue = -3;
+//   }
+
+//   /* Free memory allocated to the pattern buffer by regcomp() */
+//   regfree(&compiledRegex);
+//   return actualReturnValue;
+// }
+
+char *extract_path(const char *input) {
+  regex_t regex;
+  regmatch_t pmatch[2];
+  const char *pattern = "^GET /([^[:space:]]*)";
+  char *result = NULL;
+
+  if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
+    return NULL;  // regex failed to compile
   }
 
-  /* Execute compiled regular expression */
-  reti = regexec(&compiledRegex, textToCheck, 0, NULL, 0);
-  if (!reti) {
-    puts("Match");
-    actualReturnValue = 0;
-  } else if (reti == REG_NOMATCH) {
-    puts("No match");
-    actualReturnValue = 1;
-  } else {
-    regerror(reti, &compiledRegex, messageBuffer, sizeof(messageBuffer));
-    fprintf(stderr, "Regex match failed: %s\n", messageBuffer);
-    actualReturnValue = -3;
+  if (regexec(&regex, input, 2, pmatch, 0) == 0) {
+    int start = pmatch[1].rm_so;
+    int end = pmatch[1].rm_eo;
+    int len = end - start;
+
+    // Allocate memory (+1 for null terminator)
+    result = malloc(len + 1);
+    if (result == NULL) {
+      perror("malloc failed");
+      exit(1);
+    }
+
+    // Copy and null-terminate
+    strncpy(result, input + start, len);
+    result[len] = '\0';
   }
 
-  /* Free memory allocated to the pattern buffer by regcomp() */
-  regfree(&compiledRegex);
-  return actualReturnValue;
+  regfree(&regex);
+  return result;
 }
