@@ -78,7 +78,8 @@ int main() {
 
   char *response = "\0";
   printf("PATH: %s\n", extract_path(request_buffer));
-  if (extract_path(request_buffer) == "\0") {
+  char* path = extract_path(request_buffer);
+  if (path == NULL || strcmp(path, "") == 0) {
     // Send 200 OK response
     response = "HTTP/1.1 200 OK\r\n\r\n";
     ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
@@ -199,6 +200,12 @@ char *extract_path(const char *input) {
     int start = pmatch[1].rm_so;
     int end = pmatch[1].rm_eo;
     int len = end - start;
+
+    // If there's nothing after the slash, return NULL
+    if (len == 0) {
+      regfree(&regex);
+      return NULL;
+    }
 
     // Allocate memory (+1 for null terminator)
     result = malloc(len + 1);
