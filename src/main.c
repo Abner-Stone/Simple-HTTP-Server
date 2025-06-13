@@ -215,7 +215,7 @@ char *extract_path(const char *input) {
       printf("No path found after slash\n");
       regfree(&regex);
       printf("returning NULL\n");
-      return NULL;
+      return "";
     }
 
     // Allocate memory (+1 for null terminator)
