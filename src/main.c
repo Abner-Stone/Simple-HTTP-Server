@@ -213,7 +213,8 @@ char *extract_path(const char *input) {
     if (len == 0) {
       printf("No path found after slash\n");
       regfree(&regex);
-      return NULL;
+      printf("returning NULL\n");
+      return "HELKJALSKJDAOSIJDAOS";
     }
 
     // Allocate memory (+1 for null terminator)
