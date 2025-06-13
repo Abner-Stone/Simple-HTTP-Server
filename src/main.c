@@ -74,6 +74,7 @@ int main() {
 
   read_request(request_buffer, client_fd, server_fd);
   printf("Received request:\n%s", request_buffer);
+  printf("PRINTING PATH NOW\n");
   printf("%s\n", extract_path(request_buffer));
 
   char *response = "\0";
@@ -187,12 +188,15 @@ int read_request(char buffer[], int client_fd, int server_fd) {
 // }
 
 char *extract_path(const char *input) {
+  printf("READING PATH\n");
   regex_t regex;
   regmatch_t pmatch[2];
   const char *pattern = "^GET /([^[:space:]]*)";
   char *result = NULL;
+  printf("Input: %s\n", input);
 
   if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
+    fprintf(stderr, "Could not compile regex\n");
     return NULL;  // regex failed to compile
   }
 
