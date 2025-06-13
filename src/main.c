@@ -78,13 +78,16 @@ int main() {
   printf("%s\n", extract_path(request_buffer));
 
   char *response = "\0";
+  printf("got past extract_path\n");
   printf("PATH: %s\n", extract_path(request_buffer));
   char* path = extract_path(request_buffer);
   if (path == NULL || strcmp(path, "") == 0) {
+    printf("No valid path found in request\n");
     // Send 200 OK response
     response = "HTTP/1.1 200 OK\r\n\r\n";
     ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
   } else {
+    printf("Valid path found: %s\n", path);
     response = "HTTP/1.1 404 Not Found\r\n\r\n";
     ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
   }
@@ -196,17 +199,19 @@ char *extract_path(const char *input) {
   printf("Input: %s\n", input);
 
   if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
-    fprintf(stderr, "Could not compile regex\n");
+    printf("Could not compile regex\n");
     return NULL;  // regex failed to compile
   }
 
   if (regexec(&regex, input, 2, pmatch, 0) == 0) {
+    printf("Regex match found\n");
     int start = pmatch[1].rm_so;
     int end = pmatch[1].rm_eo;
     int len = end - start;
 
     // If there's nothing after the slash, return NULL
     if (len == 0) {
+      printf("No path found after slash\n");
       regfree(&regex);
       return NULL;
     }
@@ -224,5 +229,6 @@ char *extract_path(const char *input) {
   }
 
   regfree(&regex);
+  printf("returning result\n");
   return result;
 }
