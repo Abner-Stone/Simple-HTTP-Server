@@ -202,6 +202,7 @@ char *extract_path(const char *input) {
     printf("Could not compile regex\n");
     return NULL;  // regex failed to compile
   }
+  printf("hello gng\n");
 
   if (regexec(&regex, input, 2, pmatch, 0) == 0) {
     printf("Regex match found\n");
