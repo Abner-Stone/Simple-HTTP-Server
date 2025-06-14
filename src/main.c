@@ -72,22 +72,21 @@ int main() {
 
   char request_buffer[MAX_REQUEST_SIZE];
 
-  read_request(request_buffer, client_fd, server_fd);
+  if(read_request(request_buffer, client_fd, server_fd) < 0) {
+    printf("Failed to read request\n");
+    close(client_fd);
+    close(server_fd);
+    return 1;
+  }
   printf("Received request:\n%s", request_buffer);
-  // printf("PRINTING PATH NOW\n");
-  // printf("%s\n", extract_path(request_buffer));
 
   char *response = "\0";
-  // printf("got past extract_path\n");
-  // printf("PATH: %s\n", extract_path(request_buffer));
   char* path = extract_path(request_buffer);
   if (path == NULL || strcmp(path, "") == 0) {
-    printf("No valid path found in request\n");
     // Send 200 OK response
     response = "HTTP/1.1 200 OK\r\n\r\n";
     ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
   } else {
-    printf("Valid path found: %s\n", path);
     response = "HTTP/1.1 404 Not Found\r\n\r\n";
     ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
   }
@@ -118,12 +117,12 @@ int read_request(char buffer[], int client_fd, int server_fd) {
       printf("Select failed: %s\n", strerror(errno));
       close(client_fd);
       close(server_fd);
-      return 1;
+      return -1;
     } else if (indication == 0) {
       printf("Timeout occured, no data received within %d seconds.\n", TIMEOUT);
       close(client_fd);
       close(server_fd);
-      return 1;
+      return -2;
     }
 
     ssize_t bytes_recvd = recv(client_fd, buffer + total_read,
@@ -132,18 +131,13 @@ int read_request(char buffer[], int client_fd, int server_fd) {
       printf("Receive failed: %s \n", strerror(errno));
       close(client_fd);
       close(server_fd);
-      return 1;
+      return -3;
     }
 
     total_read += bytes_recvd;
     buffer[total_read] = '\0';
 
-    // printf("Bytes received: %zd\n", bytes_recvd);
-    // printf("Total bytes read: %d\n", total_read);
-    // printf("Buffer content: %s\n", buffer);
-
     if (strstr(buffer, "\r\n\r\n")) {
-      printf("End of request\n");
       break;
     }
 
@@ -153,69 +147,33 @@ int read_request(char buffer[], int client_fd, int server_fd) {
       // Send 413 status code
       close(client_fd);
       close(server_fd);
-      return 1;
+      return -4;
     }
   }
+
+  return total_read;
 }
 
-// int useRegex(char *textToCheck) {
-//   regex_t compiledRegex;
-//   int reti;
-//   int actualReturnValue = -1;
-//   char messageBuffer[100];
-
-//   /* Compile regular expression */
-//   reti = regcomp(&compiledRegex, "GET /[^[:space:]]*", REG_EXTENDED |
-//   REG_ICASE); if (reti) {
-//     fprintf(stderr, "Could not compile regex\n");
-//     return -2;
-//   }
-
-//   /* Execute compiled regular expression */
-//   reti = regexec(&compiledRegex, textToCheck, 0, NULL, 0);
-//   if (!reti) {
-//     puts("Match");
-//     actualReturnValue = 0;
-//   } else if (reti == REG_NOMATCH) {
-//     puts("No match");
-//     actualReturnValue = 1;
-//   } else {
-//     regerror(reti, &compiledRegex, messageBuffer, sizeof(messageBuffer));
-//     fprintf(stderr, "Regex match failed: %s\n", messageBuffer);
-//     actualReturnValue = -3;
-//   }
-
-//   /* Free memory allocated to the pattern buffer by regcomp() */
-//   regfree(&compiledRegex);
-//   return actualReturnValue;
-// }
-
 char *extract_path(const char *input) {
-  printf("READING PATH\n");
   regex_t regex;
   regmatch_t pmatch[2];
   const char *pattern = "^GET /([^[:space:]]*)";
   char *result = NULL;
-  printf("Input: %s\n", input);
 
   if (regcomp(&regex, pattern, REG_EXTENDED) != 0) {
     printf("Could not compile regex\n");
     return NULL;  // regex failed to compile
   }
-  printf("hello gng\n");
 
   if (regexec(&regex, input, 2, pmatch, 0) == 0) {
-    printf("Regex match found\n");
     int start = pmatch[1].rm_so;
     int end = pmatch[1].rm_eo;
     int len = end - start;
 
-    // If there's nothing after the slash, return NULL
+    // If there's nothing after the slash, return empty string
     if (len == 0) {
-      printf("No path found after slash\n");
       regfree(&regex);
-      printf("returning NULL\n");
-      return NULL;
+      return "";
     }
 
     // Allocate memory (+1 for null terminator)
@@ -231,6 +189,5 @@ char *extract_path(const char *input) {
   }
 
   regfree(&regex);
-  printf("returning result\n");
   return result;
 }
