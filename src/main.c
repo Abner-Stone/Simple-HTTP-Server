@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <errno.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -72,7 +74,7 @@ int main() {
 
   char request_buffer[MAX_REQUEST_SIZE];
 
-  if(read_request(request_buffer, client_fd, server_fd) < 0) {
+  if (read_request(request_buffer, client_fd, server_fd) < 0) {
     printf("Failed to read request\n");
     close(client_fd);
     close(server_fd);
@@ -80,11 +82,19 @@ int main() {
   }
   printf("Received request:\n%s", request_buffer);
 
-  char *response = "\0";
+  char* response = "\0";
   char* path = extract_path(request_buffer);
+  printf("Path: %s\n", path);
   if (path == NULL || strcmp(path, "") == 0) {
     // Send 200 OK response
     response = "HTTP/1.1 200 OK\r\n\r\n";
+    ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
+  } else if (strncmp(path, "echo/", 5) == 0) {
+    printf("len: %zu\n", strlen(path) - 5);
+    asprintf(&response,
+             "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
+             "%li\r\n\r\n%s",
+             strlen(path) - 5, path + 5);
     ssize_t bytes_sent = send(client_fd, response, strlen(response), 0);
   } else {
     response = "HTTP/1.1 404 Not Found\r\n\r\n";
@@ -154,7 +164,7 @@ int read_request(char buffer[], int client_fd, int server_fd) {
   return total_read;
 }
 
-char *extract_path(const char *input) {
+char* extract_path(const char *input) {
   regex_t regex;
   regmatch_t pmatch[2];
   const char *pattern = "^GET /([^[:space:]]*)";
